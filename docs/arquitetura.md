@@ -1,6 +1,6 @@
 # Arquitetura lógica
 
-> Independente de tecnologia. A stack será definida em uma etapa posterior.
+> Independente de tecnologia. A stack escolhida está em [decisoes/0001-stack.md](decisoes/0001-stack.md).
 
 ## Visão geral
 

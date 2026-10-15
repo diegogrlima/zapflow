@@ -37,6 +37,7 @@ O objetivo é selecionar contatos, padronizar mensagens a partir de templates ap
 | [docs/modelo-de-dados.md](docs/modelo-de-dados.md) | Entidades e relacionamentos (conceitual) |
 | [docs/roadmap.md](docs/roadmap.md) | Fases de entrega (MVP → Fase 3) |
 | [docs/setup-meta.md](docs/setup-meta.md) | Passo a passo para configurar a conta na Meta |
+| [docs/decisoes/](docs/decisoes/) | Registros de decisões técnicas (ex.: [0001 — stack](docs/decisoes/0001-stack.md)) |
 
 ## Configuração
 
