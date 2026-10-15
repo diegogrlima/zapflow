@@ -19,7 +19,9 @@ logs/
 tmp/
 temp/
 
-# Build e dependências (genérico, ajustar quando a stack for definida)
+# Build e dependências
+target/
+!.mvn/wrapper/maven-wrapper.jar
 bin/
 obj/
 dist/
