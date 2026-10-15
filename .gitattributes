@@ -2,3 +2,5 @@
 *.png binary
 *.jpg binary
 *.pdf binary
+mvnw text eol=lf
+*.cmd text eol=crlf
