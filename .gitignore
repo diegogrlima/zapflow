@@ -1,0 +1,29 @@
+# Segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Logs e temporários
+logs/
+*.log
+tmp/
+temp/
+
+# Build e dependências (genérico, ajustar quando a stack for definida)
+bin/
+obj/
+dist/
+build/
+out/
+node_modules/
+coverage/
