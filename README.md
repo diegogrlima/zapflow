@@ -1,67 +1,76 @@
-# ZapFlow
+﻿# ZapFlow
 
-Bot de comunicação para WhatsApp construído **exclusivamente sobre a API oficial da Meta (WhatsApp Business Platform – Cloud API)**.
-O objetivo é importar uma lista de contatos (CSV), montar uma mensagem a partir de um template aprovado e enviá-la para todos os contatos, **respeitando consentimento, políticas e limites da plataforma**, para reduzir o risco de bloqueio da conta.
+WhatsApp messaging application built with Java 21, Spring Boot 4 and Evolution API v2.
+The current integration sends text through an Evolution instance connected by QR code.
 
-> Status: **fase de fundação**. Stack: **Java 21 + Spring Boot 4 (Maven)**, Arquitetura Hexagonal, **sem banco de dados** ([0002](docs/decisoes/0002-sem-banco-de-dados.md)).
+## Planned application scope
 
-## Funcionalidades previstas
+CSV import, consent-aware contact selection and batch sending remain planned.
+Application data stays in memory under ADR 0002. PostgreSQL and Redis in Compose
+are dependencies of Evolution, not persistence for Zapflow contacts.
 
-- **Importação de contatos (CSV)** — telefone normalizado em E.164, deduplicação, coluna `opt_in` obrigatória e relatório de linhas rejeitadas.
-- **Montagem da mensagem** — escolha de um template aprovado da conta, variáveis com valor fixo ou coluna do CSV e pré-visualização.
-- **Envio para todos** — em segundo plano, com controle de ritmo, retentativa para erros temporários e relatório final por contato.
+## Architecture
 
-Tudo fica em memória durante a execução; reiniciar a aplicação apaga os contatos importados e o progresso do envio.
-
-## APIs de integração
-
-| API | Uso no projeto |
-|-----|----------------|
-| WhatsApp Cloud API (Messages) | Envio de templates com variáveis |
-| Message Templates API | Listagem dos templates aprovados |
-
-**Não** são utilizadas bibliotecas não oficiais que automatizam o WhatsApp Web — elas violam os termos de uso e levam a banimento.
-
-## Documentação
-
-| Documento | Conteúdo |
-|-----------|----------|
-| [docs/escopo.md](docs/escopo.md) | Escopo funcional, módulos e requisitos |
-| [docs/arquitetura.md](docs/arquitetura.md) | Arquitetura hexagonal, pacotes e fluxos |
-| [docs/regras-whatsapp.md](docs/regras-whatsapp.md) | Regras, limites, custos e políticas da plataforma |
-| [docs/modelo-de-dados.md](docs/modelo-de-dados.md) | Objetos do domínio (em memória) |
-| [docs/roadmap.md](docs/roadmap.md) | Fases de entrega |
-| [docs/setup-meta.md](docs/setup-meta.md) | Passo a passo para configurar a conta na Meta |
-| [docs/decisoes/](docs/decisoes/) | Registros de decisões técnicas (ex.: [0001 — stack](docs/decisoes/0001-stack.md)) |
-
-## Configuração
-
-As credenciais da Meta **nunca** são versionadas. Copie `.env.example` para `.env` e preencha os valores (veja [docs/setup-meta.md](docs/setup-meta.md)).
-
-## Como rodar
-
-Pré-requisito: JDK 21. O Maven vem embutido no projeto (`mvnw`).
-
-```bash
-./mvnw verify          # compila e roda os testes
-./mvnw spring-boot:run # sobe a aplicação em http://localhost:8080
+```text
+HTTP controller -> input port -> application service -> output port -> Evolution adapter
 ```
 
-Health check: `GET /actuator/health`.
+Application models and ports do not depend on Spring or HTTP DTOs. See
+[Evolution integration](docs/evolution-whatsapp.md) for configuration and request examples.
+
+## Setup
+
+Copy `.env.example` to `.env` and fill in the values. Never commit credentials.
+For local Evolution, configure `AUTHENTICATION_API_KEY` and `POSTGRES_PASSWORD`:
+
+```powershell
+docker compose up -d
+```
+
+Open `http://localhost:8081/manager`, create/connect an instance and scan its QR code.
+Set `WHATSAPP_PROVIDER_INSTANCE` to its exact name and `WHATSAPP_PROVIDER_API_KEY`
+to an authorized Evolution key. The provider URL defaults to `http://localhost:8081`.
+Hosted Evolution can be used by replacing the provider URL and credentials.
+
+Spring imports `.env` from the working directory. Restart the Java app after changes.
+
+```powershell
+.\mvnw.cmd clean test
+.\mvnw.cmd spring-boot:run
+```
+
+On Linux/macOS, use `./mvnw`. Health check: `GET /actuator/health`.
+
+## Send a message
+
+`POST http://localhost:8080/whatsapp/messages`, `Content-Type: application/json`:
+
+```json
+{
+  "number": "5511999999999",
+  "textMessage": {"text": "Hello from Zapflow!"}
+}
+```
+
+Replace the recipient before sending. Success returns `key.id`, `message.conversation`
+and `status`. Acceptance does not confirm delivery. Tests use simulated provider responses.
+
+## Documentation
+
+- [Current Evolution setup, architecture and errors](docs/evolution-whatsapp.md)
+- [Contributing](CONTRIBUTING.md)
+- Original planning documents in `docs/` describe a Meta Cloud API scope. Direct Meta
+  access, WABA template management, campaigns and webhooks are not implemented by
+  the current text messaging flow.
 
 ## CI
 
-O GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) roda `./mvnw verify` (build + testes) em todo push para `main`/`develop` e em todo Pull Request para essas branches.
+GitHub Actions runs `./mvnw verify` for the configured pushes and pull requests.
 
-## Contribuição
-
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de branches, padrão de commits e abertura de PRs.
-
-## Equipe
+## Team
 
 - Diego Lima
 - [@yago1290](https://github.com/yago1290)
 
----
+Private project - all rights reserved.
 
-Projeto privado — todos os direitos reservados.

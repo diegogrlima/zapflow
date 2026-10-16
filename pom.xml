@@ -14,7 +14,7 @@
     <artifactId>zapflow</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>zapflow</name>
-    <description>Bot de comunicação para WhatsApp sobre a API oficial da Meta (Cloud API)</description>
+    <description>WhatsApp messaging application integrated with Evolution API</description>
 
     <properties>
         <java.version>21</java.version>
