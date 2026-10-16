@@ -1,74 +1,69 @@
-# Arquitetura lógica
+# Arquitetura
 
-> Independente de tecnologia. A stack escolhida está em [decisoes/0001-stack.md](decisoes/0001-stack.md).
+> Stack em [decisoes/0001-stack.md](decisoes/0001-stack.md). Sem banco de dados: [decisoes/0002-sem-banco-de-dados.md](decisoes/0002-sem-banco-de-dados.md).
+
+O código segue a **Arquitetura Hexagonal** (portas e adaptadores): o domínio e os casos de uso ficam no centro, sem depender de Spring, HTTP, CSV ou da Meta. Tudo que fala com o mundo de fora é um *adapter* que se liga ao centro por uma *porta* (interface).
 
 ## Visão geral
 
 ```
-┌───────────────────┐      ┌──────────────────────┐      ┌──────────────────────────────┐
-│ Painel de gestão  │ ───▶ │ API do sistema       │ ───▶ │ Banco de dados               │
-│ (contatos,        │      │ (regras de negócio,  │      │ contatos, consentimentos,    │
-│  templates,       │      │  validações, auth)   │      │ templates, campanhas,        │
-│  campanhas)       │      └──────────┬───────────┘      │ mensagens, eventos, auditoria│
-└───────────────────┘                 │                  └──────────────────────────────┘
-                                      ▼
-                        ┌──────────────────────────────┐
-                        │ Fila de envio                │
-                        └──────────────┬───────────────┘
-                                       ▼
-                        ┌──────────────────────────────┐
-                        │ Worker de envio              │
-                        │ - checa opt-in/bloqueio      │
-                        │ - controla ritmo e limite    │
-                        │ - retentativa com backoff    │
-                        └──────────────┬───────────────┘
-                                       ▼
-                        ┌──────────────────────────────┐
-                        │ WhatsApp Cloud API (Meta)    │
-                        └──────────────┬───────────────┘
-                                       │ eventos (webhooks)
-                                       ▼
-                        ┌──────────────────────────────┐
-                        │ Receptor de webhooks         │
-                        │ - valida assinatura          │
-                        │ - grava evento bruto         │
-                        │ - processa em segundo plano  │
-                        └──────────────────────────────┘
-                          atualiza status, opt-outs,
-                          qualidade, janela de 24h
+         ENTRADA (quem chama o sistema)              SAÍDA (o que o sistema chama)
+
+ ┌──────────────────────────┐                    ┌────────────────────────────────┐
+ │ adapter/in/web           │                    │ adapter/out/whatsapp           │
+ │  POST /importacoes (CSV) │                    │  cliente da Cloud API (envio,  │
+ │  POST /mensagem          │    ┌──────────┐    │  listar templates aprovados)   │
+ │  POST /envios            │──▶ │ port/in  │    └───────────────▲────────────────┘
+ │  GET  /envios/atual      │    └────┬─────┘                    │
+ └──────────────────────────┘         ▼                    ┌─────┴─────┐
+ ┌──────────────────────────┐   ┌───────────────────┐      │ port/out  │
+ │ adapter/in/csv           │   │ application/      │ ───▶ └─────┬─────┘
+ │  lê o arquivo e vira     │   │ service (casos    │            │
+ │  linhas para o caso de   │   │ de uso) + domain  │      ┌─────▼──────────────────────┐
+ │  uso de importação       │   └───────────────────┘      │ adapter/out/memoria        │
+ └──────────────────────────┘                              │  guarda contatos, mensagem │
+                                                           │  e progresso do envio      │
+                                                           └────────────────────────────┘
 ```
+
+## Pacotes (`com.zapflow`)
+
+| Pacote | O que fica aqui | Exemplo |
+|--------|-----------------|---------|
+| `domain/` | Regras de negócio em Java puro, sem anotações de framework | `Telefone`, `Contato`, `Importacao`, `Mensagem`, `Envio`, `ResultadoEnvio` |
+| `application/port/in/` | Interfaces dos casos de uso (o que o sistema sabe fazer) | `ImportarContatosUseCase`, `MontarMensagemUseCase`, `EnviarParaTodosUseCase` |
+| `application/port/out/` | Interfaces do que o caso de uso precisa do mundo de fora | `EnviarTemplatePort`, `ListarTemplatesPort`, `ContatosImportadosPort`, `EnvioAtualPort` |
+| `application/service/` | Implementação dos casos de uso, usando só domínio e portas | `ImportarContatosService`, `EnviarParaTodosService` |
+| `adapter/in/web/` | Controllers REST: recebem a requisição e chamam um `port/in` | `ImportacaoController` (upload multipart) |
+| `adapter/in/csv/` | Leitura do arquivo CSV (colunas, separador, encoding) | `LeitorCsv` |
+| `adapter/out/whatsapp/` | Cliente HTTP da Cloud API, implementa as portas de envio e de templates | `WhatsAppCloudApiAdapter` |
+| `adapter/out/memoria/` | Guarda o estado da execução, implementa as portas de armazenamento | `ContatosEmMemoriaAdapter` |
+| `config/` | Configuração do Spring (beans, propriedades `zapflow.*`, executor do envio) | `EnvioConfig` |
+
+As dependências apontam **só para dentro**: `adapter → application → domain`. O domínio não importa nada dos outros pacotes.
+
+## Fluxos
+
+### 1. Importar contatos
+1. `ImportacaoController` recebe o arquivo e passa para o `LeitorCsv`, que devolve linhas (coluna → valor).
+2. `ImportarContatosService` cria um `Contato` por linha: valida `Telefone` (E.164), exige `opt_in = sim` e descarta duplicados.
+3. A `Importacao` (válidos + rejeitados) é guardada pela porta `ContatosImportadosPort` e o relatório volta na resposta.
+
+### 2. Montar a mensagem
+1. `MontarMensagemService` busca os templates `APPROVED` pela porta `ListarTemplatesPort` (adapter da Meta).
+2. O usuário escolhe um template e diz a origem de cada `{{n}}` (valor fixo ou coluna do CSV).
+3. O serviço valida que todas as variáveis têm origem e devolve a pré-visualização com o primeiro contato.
+
+### 3. Enviar para todos
+1. `POST /envios` cria o `Envio` e responde na hora (o envio segue em segundo plano).
+2. Um executor percorre os contatos respeitando `SEND_RATE_PER_SECOND` e chama `EnviarTemplatePort` para cada um.
+3. Erro temporário (ex.: `130429`) → nova tentativa com backoff exponencial até `SEND_MAX_RETRIES`. Erro definitivo → `FALHOU` com o código.
+4. `GET /envios/atual` mostra o progresso; ao final, o relatório por contato pode ser baixado.
 
 ## Princípios
 
-1. **Envio assíncrono via fila** — permite pausar campanhas, respeitar limites e reprocessar falhas.
-2. **Webhook como fonte da verdade** — o estado de cada mensagem só muda a partir dos eventos da Meta.
-3. **Regras de consentimento no motor de envio** — nenhuma rota do sistema consegue enviar sem passar pela checagem.
-4. **Idempotência** — cada envio tem uma chave única; eventos de webhook são deduplicados pelo ID.
-5. **Segredos isolados** — token, segredo do app e verify token só existem no ambiente.
-
-## Fluxos principais
-
-### Envio de campanha
-1. Usuário cria a campanha (template aprovado + segmento + variáveis + horário).
-2. Sistema resolve o público e descarta contatos sem opt-in da categoria ou bloqueados.
-3. Mensagens são enfileiradas com chave de idempotência.
-4. Worker consome a fila respeitando throughput e limite diário restante.
-5. Cloud API retorna o `wamid`; mensagem vai para `enviada`.
-6. Webhooks atualizam para `entregue`, `lida` ou `falhou`.
-
-### Opt-out
-1. Usuário responde `SAIR` ou toca no botão de opt-out.
-2. Webhook registra a mensagem recebida.
-3. Processador identifica a intenção e marca o consentimento como revogado.
-4. Contato entra na lista de bloqueio e mensagens pendentes dele são canceladas.
-5. Sistema envia confirmação de saída (dentro da janela de 24h aberta pela resposta).
-
-### Ciclo de vida de template
-1. Template criado no painel → submetido via Message Templates API.
-2. Status `PENDING` até a revisão da Meta.
-3. Webhook `message_template_status_update` atualiza para `APPROVED`/`REJECTED`.
-4. Webhook de qualidade pode levar a `PAUSED`; campanhas que usam o template são pausadas.
-
-### Proteção de qualidade
-- Job periódico consulta limite e nota de qualidade do número.
-- Qualidade `YELLOW` → alerta; `RED` → pausa automática de campanhas de marketing.
+1. **Envio assíncrono** — a requisição não espera o envio terminar.
+2. **Só template aprovado** — mensagem iniciada pela empresa sempre usa template `APPROVED`.
+3. **Sem duplicidade** — um contato recebe no máximo uma mensagem por envio.
+4. **Segredos isolados** — token e IDs da Meta só existem em variáveis de ambiente.
+5. **Trocar adapter não muda regra** — se um dia houver banco, só nasce `adapter/out/persistencia`; domínio e serviços ficam iguais.

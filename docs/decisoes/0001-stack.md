@@ -38,11 +38,13 @@ A issue #1 pede a escolha de linguagem, framework, banco, mecanismo de fila e ho
 | Build | **Maven** com wrapper (`./mvnw`), sem instalação local | Implementado no PR #22 |
 | CI | **GitHub Actions** rodando `./mvnw -B verify` em push e PR para `main`/`develop` | Implementado no PR #22 |
 | Configuração | Variáveis de ambiente (`.env.example`) mapeadas em `application.yml` sob `zapflow.*` | Implementado no PR #22 |
-| Banco | **PostgreSQL** com migrations versionadas em **Flyway** | Proposta, entra na issue #4 |
-| Fila de envio | **Tabela no próprio PostgreSQL** consumida pelo worker com `SELECT … FOR UPDATE SKIP LOCKED` | Proposta, entra na issue #11 |
+| Banco | ~~PostgreSQL com Flyway~~ | Substituída por [0002](0002-sem-banco-de-dados.md): sem banco |
+| Fila de envio | ~~Tabela no PostgreSQL com `SKIP LOCKED`~~ | Substituída por [0002](0002-sem-banco-de-dados.md): fila em memória |
 | Hospedagem | Em aberto: decidir quando houver ambiente de homologação com o número de teste da Meta | Pendente |
 
 ### Por que fila no PostgreSQL e não um broker (RabbitMQ, SQS, Redis)
+
+> Superado pelo [0002](0002-sem-banco-de-dados.md). Mantido como histórico.
 
 O volume do MVP é limitado pelo próprio limite diário da Meta (centenas a poucos milhares de envios por dia). Uma tabela de fila no mesmo banco permite gravar a mensagem e enfileirá-la **na mesma transação**, o que dá idempotência e evita mensagem perdida sem precisar de outbox. Pausar ou cancelar campanha vira um `UPDATE`. Se o volume crescer, a interface do worker permite trocar por um broker sem mudar as regras de envio.
 
@@ -61,5 +63,5 @@ O volume do MVP é limitado pelo próprio limite diário da Meta (centenas a pou
 ## Próximos passos
 
 1. Validar esta decisão com @yago1290 (revisão deste PR).
-2. Adicionar PostgreSQL, Spring Data e Flyway ao `pom.xml` na issue #4.
-3. Registrar a escolha de hospedagem em um novo registro (`0002-…`) quando for decidida.
+2. ~~Adicionar PostgreSQL, Spring Data e Flyway ao `pom.xml` na issue #4.~~ Cancelado pelo [0002](0002-sem-banco-de-dados.md).
+3. Registrar a escolha de hospedagem em um novo registro (`0003-…`) quando for decidida.
