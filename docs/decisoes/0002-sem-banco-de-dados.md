@@ -5,6 +5,8 @@
 - **Substitui:** as linhas "Banco" e "Fila de envio" do [0001](0001-stack.md)
 - **Responsável:** @diegogrlima
 
+> Templates da Meta citados abaixo foram substituídos por texto com variáveis do CSV em [0003](0003-evolution-api.md). O "sem banco" continua valendo: PostgreSQL e Redis do `docker-compose.yml` são da Evolution, não do ZapFlow.
+
 ## Contexto
 
 O objetivo do ZapFlow foi reduzido a três passos: importar contatos de um CSV, montar a mensagem a partir de um template aprovado e enviá-la para todos os contatos. Não há necessidade de cadastro permanente, campanhas, histórico ou painel.

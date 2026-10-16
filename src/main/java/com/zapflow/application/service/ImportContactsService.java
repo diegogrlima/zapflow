@@ -6,8 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.stereotype.Service;
-
 import com.zapflow.application.port.in.ContactRow;
 import com.zapflow.application.port.in.ImportContactsUseCase;
 import com.zapflow.application.port.in.ImportResult;
@@ -18,7 +16,6 @@ import com.zapflow.domain.contact.Contact;
 import com.zapflow.domain.contact.InvalidPhoneNumberException;
 import com.zapflow.domain.contact.PhoneNumber;
 
-@Service
 public class ImportContactsService implements ImportContactsUseCase {
 
     static final String NAME_COLUMN = "nome";

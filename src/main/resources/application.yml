@@ -1,6 +1,8 @@
 spring:
   application:
     name: zapflow
+  config:
+    import: optional:file:.env[.properties]
 
 server:
   port: ${SERVER_PORT:8080}
@@ -17,14 +19,7 @@ management:
 
 # Configuração lida de variáveis de ambiente (ver .env.example). Nunca coloque valores reais aqui.
 zapflow:
-  whatsapp:
-    api-version: ${WHATSAPP_API_VERSION:v24.0}
-    access-token: ${WHATSAPP_ACCESS_TOKEN:}
-    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
-    business-account-id: ${WHATSAPP_BUSINESS_ACCOUNT_ID:}
-  webhook:
-    verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
-    app-secret: ${META_APP_SECRET:}
-  envio:
-    rate-per-second: ${SEND_RATE_PER_SECOND:20}
-    max-retries: ${SEND_MAX_RETRIES:5}
+  provider:
+    base-url: ${WHATSAPP_PROVIDER_URL:http://localhost:8081}
+    instance-name: ${WHATSAPP_PROVIDER_INSTANCE:}
+    api-key: ${WHATSAPP_PROVIDER_API_KEY:}

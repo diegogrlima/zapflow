@@ -1,67 +1,50 @@
 # ZapFlow
 
-Bot de comunicação para WhatsApp construído **exclusivamente sobre a API oficial da Meta (WhatsApp Business Platform – Cloud API)**.
-O objetivo é importar uma lista de contatos (CSV), montar uma mensagem a partir de um template aprovado e enviá-la para todos os contatos, **respeitando consentimento, políticas e limites da plataforma**, para reduzir o risco de bloqueio da conta.
+Envia uma mensagem de WhatsApp para uma lista de contatos com consentimento: importa um CSV, monta a mensagem e envia para todos. Java 21 + Spring Boot 4, envio pela **Evolution API v2** ([decisão 0003](docs/decisoes/0003-evolution-api.md)), sem banco de dados ([decisão 0002](docs/decisoes/0002-sem-banco-de-dados.md)).
 
-> Status: **fase de fundação**. Stack: **Java 21 + Spring Boot 4 (Maven)**, Arquitetura Hexagonal, **sem banco de dados** ([0002](docs/decisoes/0002-sem-banco-de-dados.md)).
+## O que já funciona
 
-## Funcionalidades previstas
+| Funcionalidade | Rota | Issue |
+|----------------|------|-------|
+| Importar contatos de um CSV (`nome`, `telefone`, `opt_in` + colunas extras) | `POST /imports` (multipart, campo `file`) | #6 |
+| Enviar um texto para um contato importado | `POST /whatsapp/messages` | #8, #10 |
 
-- **Importação de contatos (CSV)** — telefone normalizado em E.164, deduplicação, coluna `opt_in` obrigatória e relatório de linhas rejeitadas.
-- **Montagem da mensagem** — escolha de um template aprovado da conta, variáveis com valor fixo ou coluna do CSV e pré-visualização.
-- **Envio para todos** — em segundo plano, com controle de ritmo, retentativa para erros temporários e relatório final por contato.
+Ainda falta: montar a mensagem com variáveis do CSV (#9) e enviar para todos com controle de ritmo (#11).
 
-Tudo fica em memória durante a execução; reiniciar a aplicação apaga os contatos importados e o progresso do envio.
+## Como rodar
 
-## APIs de integração
+1. Copie `.env.example` para `.env` e preencha. Nunca faça commit do `.env`.
+2. Suba a Evolution: `docker compose up -d`.
+3. Abra `http://localhost:8081/manager`, crie uma instância e leia o QR Code com o WhatsApp do número de envio (use um número dedicado, não o pessoal).
+4. Coloque o nome da instância em `WHATSAPP_PROVIDER_INSTANCE` e a chave em `WHATSAPP_PROVIDER_API_KEY`.
+5. Rode a aplicação:
 
-| API | Uso no projeto |
-|-----|----------------|
-| WhatsApp Cloud API (Messages) | Envio de templates com variáveis |
-| Message Templates API | Listagem dos templates aprovados |
+```bash
+./mvnw verify            # build e testes (no Windows: .\mvnw.cmd verify)
+./mvnw spring-boot:run   # sobe em http://localhost:8080
+```
 
-**Não** são utilizadas bibliotecas não oficiais que automatizam o WhatsApp Web — elas violam os termos de uso e levam a banimento.
+Health check: `GET /actuator/health`. Detalhes da integração e dos erros em [docs/evolution-whatsapp.md](docs/evolution-whatsapp.md).
 
 ## Documentação
 
 | Documento | Conteúdo |
 |-----------|----------|
-| [docs/escopo.md](docs/escopo.md) | Escopo funcional, módulos e requisitos |
-| [docs/arquitetura.md](docs/arquitetura.md) | Arquitetura hexagonal, pacotes e fluxos |
-| [docs/regras-whatsapp.md](docs/regras-whatsapp.md) | Regras, limites, custos e políticas da plataforma |
+| [docs/escopo.md](docs/escopo.md) | O que o projeto faz e o que está fora |
+| [docs/arquitetura.md](docs/arquitetura.md) | Arquitetura Hexagonal: pacotes, portas e fluxos |
 | [docs/modelo-de-dados.md](docs/modelo-de-dados.md) | Objetos do domínio (em memória) |
-| [docs/roadmap.md](docs/roadmap.md) | Fases de entrega |
-| [docs/setup-meta.md](docs/setup-meta.md) | Passo a passo para configurar a conta na Meta |
-| [docs/decisoes/](docs/decisoes/) | Registros de decisões técnicas (ex.: [0001 — stack](docs/decisoes/0001-stack.md)) |
-
-## Configuração
-
-As credenciais da Meta **nunca** são versionadas. Copie `.env.example` para `.env` e preencha os valores (veja [docs/setup-meta.md](docs/setup-meta.md)).
-
-## Como rodar
-
-Pré-requisito: JDK 21. O Maven vem embutido no projeto (`mvnw`).
-
-```bash
-./mvnw verify          # compila e roda os testes
-./mvnw spring-boot:run # sobe a aplicação em http://localhost:8080
-```
-
-Health check: `GET /actuator/health`.
+| [docs/evolution-whatsapp.md](docs/evolution-whatsapp.md) | Configuração, envio e erros da Evolution |
+| [docs/regras-whatsapp.md](docs/regras-whatsapp.md) | Boas práticas para não ter o número bloqueado |
+| [docs/decisoes/](docs/decisoes/) | Registro de decisões (ADRs) |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, commits e PRs |
 
 ## CI
 
-O GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) roda `./mvnw verify` (build + testes) em todo push para `main`/`develop` e em todo Pull Request para essas branches.
-
-## Contribuição
-
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de branches, padrão de commits e abertura de PRs.
+GitHub Actions roda `./mvnw -B verify` em push e PR para `main` e `develop`.
 
 ## Equipe
 
-- Diego Lima
-- [@yago1290](https://github.com/yago1290)
+- Diego Lima ([@diegogrlima](https://github.com/diegogrlima))
+- Yago ([@yago1290](https://github.com/yago1290))
 
----
-
-Projeto privado — todos os direitos reservados.
+Projeto privado. Todos os direitos reservados.

@@ -1,5 +1,7 @@
 # Regras e limitações da WhatsApp Business Platform
 
+> **Atenção:** desde o [0003](decisoes/0003-evolution-api.md) o ZapFlow envia pela Evolution API, não pela Cloud API. As regras abaixo são da plataforma oficial da Meta: limites, categorias e templates não se aplicam tecnicamente, mas janela, opt-in, opt-out e qualidade continuam sendo as melhores práticas para o número não ser denunciado e bloqueado.
+>
 > Levantamento feito em outubro de 2026. As regras da Meta mudam com frequência — sempre confira a documentação oficial antes de decisões de produção.
 
 ## Janela de atendimento (24h)
