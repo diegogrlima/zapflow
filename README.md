@@ -1,29 +1,24 @@
 # ZapFlow
 
 Bot de comunicação para WhatsApp construído **exclusivamente sobre a API oficial da Meta (WhatsApp Business Platform – Cloud API)**.
-O objetivo é selecionar contatos, padronizar mensagens a partir de templates aprovados e automatizar envios **respeitando consentimento, políticas e limites da plataforma**, para reduzir o risco de bloqueio da conta.
+O objetivo é importar uma lista de contatos (CSV), montar uma mensagem a partir de um template aprovado e enviá-la para todos os contatos, **respeitando consentimento, políticas e limites da plataforma**, para reduzir o risco de bloqueio da conta.
 
-> Status: **fase de fundação**. Stack: **Java 21 + Spring Boot 4 (Maven)**. O repositório contém o esqueleto da aplicação, a pipeline de CI, o escopo, a arquitetura lógica e as regras de negócio.
+> Status: **fase de fundação**. Stack: **Java 21 + Spring Boot 4 (Maven)**, Arquitetura Hexagonal, **sem banco de dados** ([0002](docs/decisoes/0002-sem-banco-de-dados.md)).
 
 ## Funcionalidades previstas
 
-- **Gestão de contatos** — cadastro, importação, tags e segmentos, seleção manual ou por filtro.
-- **Consentimento (opt-in / opt-out)** — registro auditável de cada opt-in por categoria e saída automática por palavra-chave ou botão.
-- **Templates** — cadastro espelhado da Meta, submissão para aprovação, sincronização de status e mapeamento de variáveis.
-- **Campanhas e envio automatizado** — fila com controle de ritmo, pré-validação (opt-in, template aprovado, limite diário) e retentativas.
-- **Webhooks** — status de entrega/leitura, respostas dos usuários, qualidade e status dos templates.
-- **Automação conversacional** — respostas automáticas, menus com botões e encaminhamento para humano.
-- **Monitoramento** — entregas, falhas, opt-outs, nota de qualidade, uso do limite e custo estimado.
+- **Importação de contatos (CSV)** — telefone normalizado em E.164, deduplicação, coluna `opt_in` obrigatória e relatório de linhas rejeitadas.
+- **Montagem da mensagem** — escolha de um template aprovado da conta, variáveis com valor fixo ou coluna do CSV e pré-visualização.
+- **Envio para todos** — em segundo plano, com controle de ritmo, retentativa para erros temporários e relatório final por contato.
+
+Tudo fica em memória durante a execução; reiniciar a aplicação apaga os contatos importados e o progresso do envio.
 
 ## APIs de integração
 
 | API | Uso no projeto |
 |-----|----------------|
-| WhatsApp Cloud API (Messages) | Envio de templates, mensagens livres, mídia e botões |
-| Message Templates API | Criação, listagem e status dos templates |
-| Webhooks | Mensagens recebidas, status, qualidade e templates |
-| Phone Number API | Consulta de limite de envio e nota de qualidade |
-| Marketing Messages API *(opcional)* | Campanhas promocionais |
+| WhatsApp Cloud API (Messages) | Envio de templates com variáveis |
+| Message Templates API | Listagem dos templates aprovados |
 
 **Não** são utilizadas bibliotecas não oficiais que automatizam o WhatsApp Web — elas violam os termos de uso e levam a banimento.
 
@@ -32,11 +27,12 @@ O objetivo é selecionar contatos, padronizar mensagens a partir de templates ap
 | Documento | Conteúdo |
 |-----------|----------|
 | [docs/escopo.md](docs/escopo.md) | Escopo funcional, módulos e requisitos |
-| [docs/arquitetura.md](docs/arquitetura.md) | Arquitetura lógica e fluxos |
+| [docs/arquitetura.md](docs/arquitetura.md) | Arquitetura hexagonal, pacotes e fluxos |
 | [docs/regras-whatsapp.md](docs/regras-whatsapp.md) | Regras, limites, custos e políticas da plataforma |
-| [docs/modelo-de-dados.md](docs/modelo-de-dados.md) | Entidades e relacionamentos (conceitual) |
-| [docs/roadmap.md](docs/roadmap.md) | Fases de entrega (MVP → Fase 3) |
+| [docs/modelo-de-dados.md](docs/modelo-de-dados.md) | Objetos do domínio (em memória) |
+| [docs/roadmap.md](docs/roadmap.md) | Fases de entrega |
 | [docs/setup-meta.md](docs/setup-meta.md) | Passo a passo para configurar a conta na Meta |
+| [docs/decisoes/](docs/decisoes/) | Registros de decisões técnicas (ex.: [0001 — stack](docs/decisoes/0001-stack.md)) |
 
 ## Configuração
 
