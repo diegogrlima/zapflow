@@ -1,89 +1,66 @@
-# Evolution WhatsApp integration
+# Integração com a Evolution API
 
-The application uses Evolution API v2 with a WhatsApp instance connected through QR code.
-There is no direct Meta API adapter or WABA template endpoint in this implementation.
+> Decisão em [decisoes/0003-evolution-api.md](decisoes/0003-evolution-api.md).
 
-## Architecture
+O ZapFlow envia mensagens pela Evolution API v2, com uma instância de WhatsApp conectada por QR Code.
+
+## Onde fica no código
 
 ```text
-adapter.in.web.WhatsappController
-  -> application.port.in.SendMessageUseCase
-  -> application.service.SendMessageService
-  -> application.port.out.SendMessagePort
-  -> adapter.out.whatsapp.EvolutionWhatsappAdapter
-  -> POST /message/sendText/{instance}
+adapter/in/web/WhatsappController          POST /whatsapp/messages
+  -> application/port/in/SendMessageUseCase
+  -> application/service/SendMessageService   (só envia para contatos importados)
+  -> application/port/out/SendMessagePort     sendText(PhoneNumber, texto) -> id
+  -> adapter/out/whatsapp/EvolutionWhatsappAdapter
+  -> POST {WHATSAPP_PROVIDER_URL}/message/sendText/{instância}
 ```
 
-Application models, ports and services have no Spring, HTTP or adapter imports.
-The web adapter maps request/response DTOs; the Evolution adapter maps the external
-JSON into `SentMessage`. Configuration wires the implementations using constructor injection.
+A porta `SendMessagePort` não sabe que a Evolution existe: recebe um `PhoneNumber` (E.164) e um texto e devolve o id da mensagem. O adapter converte `+5521999999999` para `5521999999999`, monta o JSON da Evolution e traduz os erros HTTP para `WhatsappProviderException`.
 
-## Configuration
+## Configuração
 
-Spring imports the `.env` in its working directory. Existing environment variables
-can also supply these values. Restart the Java application after changing them.
+O Spring lê o `.env` da pasta onde a aplicação roda (ou variáveis de ambiente). Reinicie a aplicação depois de mudar.
 
 ```dotenv
 WHATSAPP_PROVIDER_URL=http://localhost:8081
 WHATSAPP_PROVIDER_INSTANCE=ZapFlow
-WHATSAPP_PROVIDER_API_KEY=your-evolution-key
+WHATSAPP_PROVIDER_API_KEY=sua-chave-da-evolution
 ```
 
-The instance name is case sensitive. The key is sent in the `apikey` header.
-For local Docker, also set `AUTHENTICATION_API_KEY` and `POSTGRES_PASSWORD` as
-shown in `.env.example`; the provider key must match an authorized Evolution key.
-For a hosted Evolution server, use its URL, instance name and API key instead.
+O nome da instância diferencia maiúsculas de minúsculas. A chave vai no header `apikey`. Para a Evolution local no Docker, preencha também `AUTHENTICATION_API_KEY` e `POSTGRES_PASSWORD` (ver `.env.example`).
 
-## Send text
+## Envio de teste para um número
 
-`POST http://localhost:8080/whatsapp/messages`, `Content-Type: application/json`:
+Só funciona para um telefone que veio na última importação de CSV (com `opt_in = sim`).
+
+`POST http://localhost:8080/whatsapp/messages`
 
 ```json
-{
-  "number": "5511999999999",
-  "textMessage": {"text": "Hello from Zapflow!"},
-  "delay": 1000,
-  "linkPreview": false,
-  "mentioned": []
-}
+{ "phone": "(21) 99999-9999", "text": "Olá do ZapFlow!" }
 ```
 
-Replace the example recipient before sending. The adapter converts `textMessage.text`
-to the top-level `text` field required by Evolution. Delay, quoted message, link
-preview and mentions are optional. Empty quoted objects and mentions are omitted.
-
-Example response:
+Resposta:
 
 ```json
-{
-  "key": {"id": "MESSAGE_ID", "remoteJid": "5511999999999@s.whatsapp.net", "fromMe": true},
-  "message": {"conversation": "Hello from Zapflow!"},
-  "status": "PENDING"
-}
+{ "messageId": "ID_NA_EVOLUTION", "phone": "+5521999999999" }
 ```
 
-The returned message ID belongs to Evolution. `PENDING` indicates acceptance, not
-confirmed delivery. This endpoint sends plain text and does not list WABA templates.
+Aceito pela Evolution não quer dizer entregue.
 
-## Error handling
+## Erros
 
-Errors include a safe `message`, `failureType`, and nullable `providerCode`.
-Here `providerCode` is the upstream HTTP status, not a Meta error code.
+As respostas de erro seguem o formato `ProblemDetail` (`status`, `detail`).
 
-- Evolution 401/403/404: `CONFIGURATION`, exposed as HTTP 503.
-- Evolution 429/5xx or network timeout: `TEMPORARY`, exposed as HTTP 503.
-- Other Evolution 4xx or malformed success: `PERMANENT`, exposed as HTTP 502.
-- Missing key/instance: `CONFIGURATION`, exposed as HTTP 503, without an upstream call.
-- Invalid HTTP input: HTTP 400 before calling the provider.
+| Situação | HTTP |
+|----------|------|
+| Corpo inválido ou telefone inválido | 400 |
+| Telefone fora da última importação | 422 |
+| Evolution recusou (outros 4xx, resposta inválida) | 502, `failureType: PERMANENT` |
+| Evolution 401/403/404 ou instância/chave não configuradas | 503, `failureType: CONFIGURATION` |
+| Evolution 429/5xx ou sem resposta | 503, `failureType: TEMPORARY` |
 
-Raw upstream error bodies and API keys are not returned. No automatic retries are
-performed: a timed-out send might already have been accepted.
+`providerCode` é o status HTTP devolvido pela Evolution. Corpo de erro da Evolution e chaves nunca são devolvidos. Não há retentativa automática: se a Evolution não respondeu, a mensagem pode ter sido entregue.
 
-## Validation
+## Testes
 
-Run `.\mvnw.cmd clean test` on Windows. Tests cover the HTTP contract, optional
-fields, response mapping, error classes, invalid responses and web validation.
-All provider responses are simulated; tests do not send messages.
-
-The older planning documents describe the original Meta scope. The current
-implementation and runtime setup are documented here.
+`./mvnw verify` cobre o contrato HTTP, a conversão do telefone, a classificação de erros e a checagem de contato importado. As respostas da Evolution são simuladas; nenhum teste envia mensagem de verdade.

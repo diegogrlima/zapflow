@@ -1,17 +1,17 @@
 # Roadmap
 
-> Revisado em 2026-10-16: escopo reduzido a importar contatos, montar a mensagem e enviar para todos, sem banco de dados ([0002](decisoes/0002-sem-banco-de-dados.md)).
+> Revisado em 2026-10-16: escopo reduzido a importar contatos, montar a mensagem e enviar para todos, sem banco de dados ([0002](decisoes/0002-sem-banco-de-dados.md)), enviando pela Evolution API ([0003](decisoes/0003-evolution-api.md)).
 
 ## Fase 0 — Fundação
 - [x] Definir stack tecnológica (#1)
-- [x] Configurar conta Meta Business, app e número de teste (#2)
+- [x] ~~Configurar conta Meta Business, app e número de teste (#2)~~ substituído pela Evolution ([0003](decisoes/0003-evolution-api.md))
 - [x] Estrutura inicial do código e pipeline de CI (#3)
 
 ## Fase 1 — MVP
-- [ ] Contato e telefone E.164 no domínio (#5)
-- [ ] Importação de contatos por CSV (#6)
-- [ ] Cliente da WhatsApp Cloud API (#8)
-- [ ] Montar a mensagem a partir de template aprovado (#9)
+- [x] Contato e telefone E.164 no domínio (#5)
+- [x] Importação de contatos por CSV (#6)
+- [x] Cliente da Evolution API (#8)
+- [ ] Montar a mensagem com variáveis do CSV (#9)
 - [ ] Envio de teste para um número (#10)
 - [ ] Envio para todos os contatos com controle de ritmo e retentativa (#11)
 

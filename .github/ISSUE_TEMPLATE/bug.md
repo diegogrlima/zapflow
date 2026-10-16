@@ -13,7 +13,7 @@ labels: bug
 1. 
 2. 
 
-## Código de erro da Meta (se houver)
+## Erro da Evolution (se houver: status HTTP e `failureType`)
 <!-- ex.: 130429, 131047 -->
 
 ## Evidências
