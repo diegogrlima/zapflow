@@ -1,79 +1,47 @@
 # Escopo do projeto
 
+> Revisado em 2026-10-16: o projeto **não usa banco de dados** (ver [decisoes/0002-sem-banco-de-dados.md](decisoes/0002-sem-banco-de-dados.md)).
+
 ## Objetivo
 
-Permitir que um negócio envie mensagens padronizadas pelo WhatsApp para contatos selecionados que deram consentimento, de forma automatizada, rastreável e dentro das políticas da Meta.
+Importar uma lista de contatos (CSV), montar uma mensagem a partir de um template aprovado pela Meta e enviá-la para todos os contatos da lista, pela API oficial (WhatsApp Cloud API), respeitando limites e políticas da plataforma.
+
+## O fluxo, de ponta a ponta
+
+1. **Importar contatos** — o usuário envia um CSV com nome, telefone e campos extras. O sistema normaliza os telefones (E.164), remove duplicados e rejeita linhas inválidas, devolvendo um relatório.
+2. **Montar a mensagem** — o usuário escolhe um template **aprovado** da sua conta (lido na hora da Meta) e define as variáveis (`{{1}}`, `{{2}}`…) com valores fixos ou colunas do CSV. O sistema mostra uma pré-visualização com um contato real.
+3. **Enviar para todos** — o envio roda em segundo plano, com controle de ritmo e retentativa para erros temporários. Ao final, o sistema devolve um relatório por contato (enviado, com o `wamid`, ou falhou, com o código de erro).
+
+Tudo isso vive **em memória** durante a execução da aplicação. Reiniciar a aplicação apaga contatos importados e o progresso de um envio.
+
+## Por que template e não texto livre
+
+Fora da janela de 24h (contato que não falou com a empresa no último dia), a Meta só aceita mensagens iniciadas pelo negócio com **template aprovado**. Por isso "montar a mensagem" é escolher o template e preencher as variáveis, não digitar um texto qualquer. Ver [regras-whatsapp.md](regras-whatsapp.md).
 
 ## Fora do escopo
 
-- Uso de bibliotecas/automação não oficiais do WhatsApp Web ou do app comum.
-- Envio para contatos sem opt-in ("listas compradas", contatos frios).
-- Chatbot de IA de propósito geral sem finalidade de negócio (proibido pela política da Meta).
-- Múltiplos números/contas para contornar limites de envio.
+- Banco de dados e qualquer histórico entre execuções (contatos, envios, consentimentos).
+- Cadastro manual de contatos (CRUD), tags e segmentos: a lista é sempre o CSV importado.
+- Registro e gestão de consentimento dentro do sistema (ver "Consentimento" abaixo).
+- Webhooks: status de entrega/leitura, mensagens recebidas, opt-out automático.
+- Campanhas agendadas, pausar/retomar envio, painel de métricas e alertas.
+- Criação e submissão de templates pelo sistema (criar no Gerenciador do WhatsApp da Meta).
+- Chatbot, respostas automáticas e atendimento humano.
+- Bibliotecas não oficiais do WhatsApp Web, listas sem opt-in e múltiplos números para contornar limites.
 
-## Módulos
+## Consentimento (responsabilidade de quem monta o CSV)
 
-### 1. Onboarding e conta
-- Conta Meta Business verificada, WhatsApp Business Account (WABA) e número dedicado.
-- Nome de exibição aprovado.
-- Armazenamento seguro de token de acesso, `phone_number_id`, `waba_id` e segredo do app.
+A Meta exige opt-in antes de qualquer mensagem iniciada pelo negócio e exige que a empresa consiga comprová-lo. Sem banco, o ZapFlow **não guarda** essa prova. Regras:
 
-### 2. Gestão de contatos
-- CRUD de contatos (nome, telefone em formato E.164, campos personalizados).
-- Importação em lote com validação e deduplicação de telefone.
-- Tags e segmentos dinâmicos (filtros).
-- Seleção manual de contatos ou por segmento para uma campanha.
-
-### 3. Consentimento
-- Registro de opt-in: data/hora, origem (formulário, presencial, resposta no WhatsApp…), texto aceito e categorias autorizadas (marketing, utilidade).
-- Opt-out por palavra-chave (`SAIR`, `PARAR`, `STOP`) ou botão de resposta rápida.
-- Lista de bloqueio consultada **obrigatoriamente** pelo motor de envio.
-- Histórico auditável (nunca apagar o registro do consentimento, apenas mudar o estado).
-
-### 4. Templates
-- Cadastro local espelhando os templates da Meta: nome, categoria, idioma, corpo, cabeçalho, rodapé, botões e variáveis.
-- Submissão para aprovação via API e sincronização de status (`PENDING`, `APPROVED`, `REJECTED`, `PAUSED`, `DISABLED`).
-- Mapeamento de variáveis (`{{1}}`, `{{2}}`…) para campos do contato ou valores fixos da campanha.
-- Pré-visualização da mensagem com dados de um contato real.
+- O CSV deve conter apenas contatos que deram opt-in. A coluna `opt_in` (`sim`/`nao`) é obrigatória: linhas sem `sim` são rejeitadas na importação.
+- A prova do opt-in (data, origem, texto aceito) fica fora do sistema, com quem gera o CSV.
+- Quem pedir para sair deve ser retirado da planilha de origem antes do próximo envio.
 - Templates de marketing devem conter instrução de opt-out.
-
-### 5. Campanhas e envio
-- Campanha = template + público + parâmetros + agendamento.
-- Pré-validação de cada destinatário:
-  - possui opt-in ativo para a categoria do template?
-  - não está na lista de bloqueio?
-  - template está `APPROVED`?
-  - cabe no limite diário restante do portfólio?
-- Fila de envio assíncrona com controle de ritmo (throughput) e retentativa com backoff exponencial para erros temporários (ex.: `130429`).
-- Pausar, retomar e cancelar campanha.
-- Estados por mensagem: `enfileirada → enviada → entregue → lida` ou `falhou` (com código de erro).
-
-### 6. Webhooks e conversas
-- Verificação do endpoint (challenge) e validação da assinatura `X-Hub-Signature-256`.
-- Processamento idempotente de eventos (podem chegar duplicados ou fora de ordem).
-- Registro de mensagens recebidas e abertura/fechamento da janela de atendimento de 24h.
-- Detecção de opt-out em mensagens recebidas.
-- Atualizações de qualidade e status de templates.
-
-### 7. Automação conversacional
-- Respostas automáticas por palavra-chave.
-- Menus com botões / listas interativas.
-- Encaminhamento para atendimento humano.
-
-### 8. Monitoramento
-- Painel: enviadas, entregues, lidas, falhas, opt-outs, nota de qualidade, uso do limite diário, custo estimado por categoria.
-- Alertas: queda de qualidade, template pausado, limite próximo do fim, taxa de falha alta.
-- Pausa automática de campanhas quando a qualidade cair.
-
-### 9. Segurança e LGPD
-- Segredos fora do código (variáveis de ambiente / cofre).
-- Autenticação e perfis de acesso no painel.
-- Logs de auditoria (quem criou/disparou campanhas, quem alterou consentimentos).
-- Retenção mínima de dados e exclusão a pedido do titular.
 
 ## Requisitos não funcionais
 
-- Envio sempre assíncrono (nunca em loop síncrono na requisição do usuário).
-- Webhook deve responder rapidamente (200) e processar em segundo plano.
-- Idempotência no envio (não duplicar mensagem em retentativas).
-- Observabilidade: logs estruturados e correlação por ID de mensagem da Meta (`wamid`).
+- Envio sempre assíncrono (a requisição que dispara o envio responde na hora; o envio segue em segundo plano).
+- Ritmo configurável (`SEND_RATE_PER_SECOND`) e retentativa com backoff exponencial para erros temporários (ex.: `130429`), até `SEND_MAX_RETRIES`.
+- Nenhum contato recebe a mesma mensagem duas vezes no mesmo envio (deduplicação por telefone e uma tentativa bem-sucedida por contato).
+- Um envio por vez: não iniciar outro enquanto um estiver em andamento.
+- Segredos só em variáveis de ambiente. Logs estruturados com o `wamid` de cada mensagem.

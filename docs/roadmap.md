@@ -1,26 +1,19 @@
 # Roadmap
 
+> Revisado em 2026-10-16: escopo reduzido a importar contatos, montar a mensagem e enviar para todos, sem banco de dados ([0002](decisoes/0002-sem-banco-de-dados.md)).
+
 ## Fase 0 — Fundação
-- [ ] Definir stack tecnológica
-- [ ] Configurar conta Meta Business, app e número de teste (ver [setup-meta.md](setup-meta.md))
-- [ ] Estrutura inicial do código e pipeline de CI
+- [x] Definir stack tecnológica (#1)
+- [x] Configurar conta Meta Business, app e número de teste (#2)
+- [x] Estrutura inicial do código e pipeline de CI (#3)
 
 ## Fase 1 — MVP
-- [ ] Cadastro e importação de contatos
-- [ ] Registro de opt-in / opt-out
-- [ ] Sincronização de templates com a Meta
-- [ ] Envio individual de template
-- [ ] Envio em lote via fila com controle de ritmo
-- [ ] Receptor de webhooks (status de mensagens)
+- [ ] Contato e telefone E.164 no domínio (#5)
+- [ ] Importação de contatos por CSV (#6)
+- [ ] Cliente da WhatsApp Cloud API (#8)
+- [ ] Montar a mensagem a partir de template aprovado (#9)
+- [ ] Envio de teste para um número (#10)
+- [ ] Envio para todos os contatos com controle de ritmo e retentativa (#11)
 
-## Fase 2 — Campanhas
-- [ ] Campanhas agendadas
-- [ ] Tags e segmentação
-- [ ] Opt-out automático por palavra-chave / botão
-- [ ] Painel de métricas (entregas, falhas, opt-outs, custo)
-
-## Fase 3 — Automação e proteção
-- [ ] Fluxos conversacionais (respostas automáticas, menus)
-- [ ] Encaminhamento para atendimento humano
-- [ ] Monitoramento de qualidade e limite com alertas
-- [ ] Pausa automática de campanhas por queda de qualidade
+## Fora do escopo atual
+Banco e migrations (#4), registro de consentimento (#7), webhooks (#12, #13), campanhas agendadas (#14), tags (#15), opt-out automático (#16), painel (#17), automação (#18, #19) e monitoramento (#20, #21). Essas issues foram fechadas como "not planned" e podem ser reabertas se o escopo crescer.

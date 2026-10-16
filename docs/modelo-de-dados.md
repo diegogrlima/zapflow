@@ -1,41 +1,34 @@
-# Modelo de dados (conceitual)
+# Modelo de dados (domínio, em memória)
 
-> Modelo lógico, sem amarração a banco ou ORM.
+> Sem banco de dados ([0002](decisoes/0002-sem-banco-de-dados.md)). Estes objetos existem só em memória enquanto a aplicação roda e ficam no pacote `domain` (Java puro, sem anotações de framework).
 
 ```
-Contato 1───N Consentimento
-Contato N───N Tag
-Segmento (filtro sobre Contato/Tag)
-Template 1───N VariavelTemplate
-Campanha N───1 Template
-Campanha N───1 Segmento (ou lista manual de Contatos)
-Campanha 1───N Mensagem
-Mensagem N───1 Contato
-Mensagem 1───N EventoMensagem
-MensagemRecebida N───1 Contato
-EventoWebhook (bruto, para auditoria e reprocessamento)
-Auditoria (ações de usuários do painel)
+Importacao 1───N Contato
+Importacao 1───N LinhaRejeitada
+Mensagem   N───1 Template            (template aprovado lido da Meta)
+Mensagem   1───N Variavel
+Envio      1───1 Mensagem
+Envio      1───N ResultadoEnvio
+ResultadoEnvio N───1 Contato
 ```
 
-## Entidades
+## Objetos
 
-| Entidade | Campos principais |
-|----------|-------------------|
-| **Contato** | id, nome, telefone (E.164, único), campos personalizados, criado_em, ultima_interacao_em |
-| **Consentimento** | id, contato_id, categoria (marketing/utilidade), estado (ativo/revogado), origem, texto_aceito, data_opt_in, data_opt_out |
-| **Tag** | id, nome |
-| **Segmento** | id, nome, regra de filtro |
-| **Template** | id, nome_meta, id_meta, categoria, idioma, status, qualidade, componentes (cabeçalho/corpo/rodapé/botões), atualizado_em |
-| **VariavelTemplate** | id, template_id, posição, origem (campo do contato ou valor fixo), exemplo |
-| **Campanha** | id, nome, template_id, segmento_id, agendada_para, estado (rascunho/agendada/enviando/pausada/concluída/cancelada), criada_por |
-| **Mensagem** | id, campanha_id, contato_id, wamid, chave_idempotencia, estado, codigo_erro, enviada_em, entregue_em, lida_em |
-| **EventoMensagem** | id, mensagem_id, tipo, payload, recebido_em |
-| **MensagemRecebida** | id, contato_id, wamid, tipo, conteúdo, recebida_em |
-| **EventoWebhook** | id, id_evento_meta (único), payload bruto, processado, recebido_em |
-| **Auditoria** | id, usuario, ação, entidade, entidade_id, data |
+| Objeto | Campos principais | Observação |
+|--------|-------------------|------------|
+| **Telefone** | valor (E.164) | *Value object*: só existe se for válido; normaliza `(21) 99999-9999` para `+5521999999999` |
+| **Contato** | nome, telefone, campos extras (coluna → valor) | Vem de uma linha do CSV |
+| **Importacao** | contatos válidos, linhas rejeitadas | Resultado da leitura do CSV |
+| **LinhaRejeitada** | número da linha, motivo | Ex.: telefone inválido, duplicado, sem opt-in |
+| **Template** | nome, idioma, categoria, corpo, quantidade de variáveis | Lido da Meta na hora; só `APPROVED` é aceito |
+| **Variavel** | posição (`{{n}}`), origem (valor fixo ou coluna do CSV) | |
+| **Mensagem** | template, variáveis | Sabe gerar os parâmetros para um contato e a pré-visualização |
+| **Envio** | id, mensagem, estado (`EM_ANDAMENTO`, `CONCLUIDO`), total, enviados, falhas, iniciado_em | Um por vez |
+| **ResultadoEnvio** | contato, estado (`ENVIADO`, `FALHOU`), wamid, código de erro, tentativas | |
 
 ## Regras importantes
-- Telefone sempre normalizado em E.164 (ex.: `+5521999999999`).
-- Consentimento nunca é apagado — muda de estado e mantém histórico.
-- `wamid` e `id_evento_meta` são únicos (garantem idempotência).
-- Janela de 24h é derivada de `Contato.ultima_interacao_em`.
+- Telefone sempre normalizado em E.164 e único dentro da importação.
+- Linha sem `opt_in = sim` é rejeitada.
+- Toda variável do template precisa ter origem; coluna inexistente no CSV é erro antes de enviar.
+- Cada contato recebe no máximo uma mensagem por envio.
+- Reiniciar a aplicação apaga tudo: o relatório do envio deve ser baixado ao final.
