@@ -5,6 +5,8 @@
 - **Issue:** #1
 - **Responsável:** @diegogrlima
 
+> A integração com a Cloud API da Meta descrita no contexto foi substituída pela Evolution API em [0003](0003-evolution-api.md). Linguagem, framework, build e CI continuam valendo.
+
 ## Contexto
 
 O ZapFlow integra com a WhatsApp Cloud API da Meta para enviar templates a contatos com consentimento e processar webhooks (ver [escopo](../escopo.md) e [arquitetura](../arquitetura.md)). A stack precisa atender a requisitos que a arquitetura lógica já fixa:
