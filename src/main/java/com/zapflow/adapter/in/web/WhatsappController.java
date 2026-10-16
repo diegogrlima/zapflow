@@ -1,38 +1,57 @@
 package com.zapflow.adapter.in.web;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.zapflow.adapter.in.web.dto.SendMessageRequest;
 import com.zapflow.adapter.in.web.dto.SendMessageResponse;
-import com.zapflow.application.model.SendMessageCommand;
-import com.zapflow.application.model.WhatsappProviderException;
+import com.zapflow.application.port.in.ContactNotImportedException;
+import com.zapflow.application.port.in.SendMessageCommand;
 import com.zapflow.application.port.in.SendMessageUseCase;
+import com.zapflow.application.port.out.WhatsappProviderException;
+import com.zapflow.domain.contact.InvalidPhoneNumberException;
+import com.zapflow.domain.contact.PhoneNumber;
+
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class WhatsappController {
-    private final SendMessageUseCase sender;
 
-    public WhatsappController(SendMessageUseCase sender) {
-        this.sender = sender;
+    private final SendMessageUseCase sendMessage;
+
+    public WhatsappController(SendMessageUseCase sendMessage) {
+        this.sendMessage = sendMessage;
     }
 
     @PostMapping("/whatsapp/messages")
     public SendMessageResponse sendMessage(@Valid @RequestBody SendMessageRequest request) {
-        var result = sender.sendMessage(new SendMessageCommand(request.number(), request.textMessage().text(),
-                request.delay(), request.quoted(), request.linkPreview(), request.mentioned()));
-        return new SendMessageResponse(new SendMessageResponse.Key(result.messageId(), result.recipient(), result.fromMe()),
-                new SendMessageResponse.Message(result.text()), result.status());
+        var command = new SendMessageCommand(PhoneNumber.of(request.phone()), request.text());
+        var sent = sendMessage.sendMessage(command);
+        return new SendMessageResponse(sent.messageId(), sent.phone().value());
     }
 
-    public record ProviderError(String message, String failureType, Integer providerCode) { }
+    @ExceptionHandler(InvalidPhoneNumberException.class)
+    ProblemDetail handleInvalidPhone(InvalidPhoneNumberException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    // Sem opt_in não há envio: o número precisa ter vindo na última importação
+    @ExceptionHandler(ContactNotImportedException.class)
+    ProblemDetail handleNotImported(ContactNotImportedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
+    }
 
     @ExceptionHandler(WhatsappProviderException.class)
-    public ResponseEntity<ProviderError> handleProviderError(WhatsappProviderException exception) {
-        var status = exception.getFailureType() == WhatsappProviderException.FailureType.PERMANENT
+    ProblemDetail handleProviderError(WhatsappProviderException e) {
+        var status = e.failureType() == WhatsappProviderException.FailureType.PERMANENT
                 ? HttpStatus.BAD_GATEWAY : HttpStatus.SERVICE_UNAVAILABLE;
-        return ResponseEntity.status(status).body(new ProviderError(exception.getMessage(),
-                exception.getFailureType().name(), exception.getProviderCode()));
+        var problem = ProblemDetail.forStatusAndDetail(status, e.getMessage());
+        problem.setProperty("failureType", e.failureType().name());
+        problem.setProperty("providerCode", e.providerCode());
+        return problem;
     }
 }
