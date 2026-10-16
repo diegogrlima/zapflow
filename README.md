@@ -1,4 +1,4 @@
-﻿# ZapFlow
+# ZapFlow
 
 WhatsApp messaging application built with Java 21, Spring Boot 4 and Evolution API v2.
 The current integration sends text through an Evolution instance connected by QR code.
@@ -73,4 +73,3 @@ GitHub Actions runs `./mvnw verify` for the configured pushes and pull requests.
 - [@yago1290](https://github.com/yago1290)
 
 Private project - all rights reserved.
-
